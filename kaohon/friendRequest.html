@@ -1,0 +1,396 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta http-equiv="Content-Language" content="ja" />
+<meta http-equiv="Content-Style-Type" content="text/css" />
+<meta http-equiv="Content-Script-Type" content="text/javascript" />
+
+<link type="text/css" href="css/jquery-ui-1.10.0.custom.min.css" rel="stylesheet" />
+<script type="text/javascript" src="js/jquery-1.8.3.min.js"></script>
+<script type="text/javascript" src="js/jquery-ui-1.10.0.custom.min.js"></script>
+<script type="text/javascript" src="js/jquery.cookie.js"></script>
+<script type="text/javascript">
+
+$(function(){
+	$("#container").hide();
+	console.log($.cookie());
+
+	$.ajax({
+		type: "POST",
+		url: "./cgi/svc/checkLoginStatus.php",
+		data: {
+		},
+		dataType: "json",
+		complete: function(data) {
+			var res = $.parseJSON(data.responseText);
+			console.log(data.responseText);
+			if(res.result){
+				$("#container").show();
+				doInit();
+			}else{
+				window.location.href="./index.html";
+			}
+		}
+	});
+
+});
+
+function doInit(){
+	$("#loadingArea").prepend('<div id="loadingImg"><img alt="LOADING" src="img/loading.gif"></img></div>');
+
+	$("#userName").text($.cookie("userName"));
+	$("#firstName").text($.cookie("firstName"));
+	$("#familyName").text($.cookie("familyName"));
+	$("#description").text($.cookie("description"));
+	
+	configModal();
+
+	$.ajax({
+		type: "POST",
+		url: "./cgi/svc/getFriendRequest.php",
+		data: {},
+		dataType: "json",
+		complete: function(data) {
+			var res = $.parseJSON(data.responseText);
+			console.log(res);
+			
+			$("#messageArea").empty();
+
+			var list = res.friendRequestList;
+			var max = list.length
+			for(var i=0; i<max; i++){
+				var appendStr
+					= '<div class="user">'
+					+ '\t<div class="userName">' + list[i].userName + '</div>'
+					+ '\t<div class="userNameSub">' + list[i].familyName + '</div>'
+					+ '\t<div class="userNameSub">' + list[i].firstName + '</div>'
+					+ '\t<div class="description">' + list[i].description + '</div>'
+					+ '\t<button class="friendConfirm" id="' + list[i].userId + '">承認</button>'
+					+ '\t<div id="spacer"></div>'
+					+ '</div>';
+				
+				//$("#messageArea").append(appendStr);
+				$(appendStr).hide().appendTo("#messageArea").fadeIn();
+			}
+			
+			$("#loadingImg").hide();
+		}
+	});
+
+}
+
+function configModal(){
+    //ダイアログで使用するdivを追加
+    $("body").append('<div id="modalDialog"><img alt="LOADING" src="img/loading.gif" align="center"></img></div>');
+
+    $("#modalDialog").dialog({
+    	height:"110",
+    	width:"auto",
+    	resizable: "none",
+    	closeOnEscape: false,
+        modal: true,
+        autoOpen: false,
+        buttons: {},
+	    open:function(event, ui){
+	    	$(".ui-dialog-titlebar").hide();
+	    	
+	    	$(".ui-widget-overlay").css("opacity","0.1");
+	    	$(".ui-widget-overlay").css("background-color","none");
+	    	
+	    	$(".ui-dialog").css("opacity","0.05");
+	    	$(".ui-dialog").css("background-color","none");
+	    	$(".ui-dialog").css("border","none");
+	    }
+    });
+}
+
+$(".friendConfirm").live("click", function(){
+	var friendId = $(this).attr("id");
+	var postData = {friendId:friendId};
+	$("#modalDialog").dialog("open");
+
+	$.ajax({
+		type: "POST",
+		url: "./cgi/svc/confirmFriend.php",
+		data: postData,
+		dataType: "json",
+		complete: function(data) {
+			var res = $.parseJSON(data.responseText);
+			console.log(res);
+			$("#modalDialog").dialog("close");
+
+			if(res.result){
+				$("#"+friendId).attr("class","friend");
+				$("#"+friendId).text("友達");
+			}
+		}
+	});
+
+});
+
+//menu link
+
+$("#title").live("click",function(){
+	window.location.href="./list.html";
+});
+
+$("#menuTimeline").live("click",function(){
+	window.location.href="./list.html";
+});
+
+$("#menuFriendList").live("click",function(){
+	window.location.href="./friendList.html";
+});
+
+$("#menuFriendSearch").live("click",function(){
+	window.location.href="./friendSearch.html";
+});
+
+$("#logout").live("click",function(){
+	$.ajax({
+		type: "POST",
+		url: "./cgi/svc/logout.php",
+		data: {},
+		dataType: "json",
+		complete: function(data) {
+			for(var key in $.cookie()){
+				$.cookie(key,null);
+			}
+			window.location.href="./index.html";
+		}
+	});
+});
+
+</script>
+<style type="text/css">
+p, h1, form, button{border:0; margin:0; padding:0;}
+
+body {
+	text-align:center;
+}
+
+#container {
+	width:700px;
+	margin-left:auto;
+	margin-right:auto;
+	text-align:left;
+	background:#ebf4fb;
+	padding:14px;
+}
+
+#headerArea h1 {
+	font-size:16px;
+	font-weight:bold;
+	margin-bottom:2px;
+	margin-left:2px;
+	padding-bottom:6px;
+	display: inline-block;
+	cursor: pointer;
+}
+
+#headerArea #logout {
+	color: #A0A0A0;
+	font-size:8px;
+	float:right;
+	margin-top:8px;
+	margin-bottom:1px;
+	margin-right:4px;
+	padding-bottom:1px;
+	display: inline-block;
+	cursor: pointer;
+}
+
+#headerArea #spacer {
+	border-bottom:solid 1px #b7ddf2;
+}
+
+#profileArea {
+	width:190px;
+	float:left;
+	margin:20px 2px 20px 2px;
+	cursor: default;
+}
+
+#profileArea h1 {
+	font-size:12px;
+	font-weight:bold;
+	margin-bottom:8px;
+	border-bottom:solid 1px #b7ddf2;
+	padding-top:4px;
+	padding-bottom:8px;
+}
+#profileArea .nameArea {
+	font-size:10px;
+	margin-bottom:8px;
+	padding-bottom:2px;
+	display: inline-block;
+}
+#profileArea .descriptionArea {
+	font-size:12px;
+	margin-bottom:2px;
+	padding-bottom:2px;
+}
+
+#profileArea #spacer{
+	margin-top:15px;
+	margin-bottom:5px;
+	border-bottom:solid 1px #b7ddf2;
+}
+
+#menuArea div{
+	font-size:12px;
+	margin-top:10px;
+	margin-bottom:10px;
+}
+
+#menuArea .menuItem{
+	margin-left:10px;
+	cursor: pointer;
+	color: #b7ddff;
+	font-weight:bold;
+}
+
+#menuArea .menuItemCurrent{
+	margin-left:10px;
+	cursor: default;
+	color: #C0C0C0;
+	font-weight:bold;
+}
+
+#timelineArea {
+	width:483px;
+	float:left;
+	margin:10px 2px 20px 2px;
+	padding-left: 16px;
+}
+
+#timelineArea .submit{
+	clear:both;
+	width:100px;
+	height:22px;
+	background:#666666;
+	text-align:center;
+	line-height:10px;
+	color:#FFFFFF;
+	font-size:11px;
+	font-weight:bold;
+	margin-top:6px;
+	cursor: pointer;
+}
+
+#timelineArea #inputArea {
+	font-size:14px;
+	font-weight:bold;
+	margin-top:14px;
+	margin-bottom:2px;
+	border-bottom:solid 1px #b7ddf2;
+	padding-bottom:6px;
+}
+
+#timelineArea #inputArea p{
+	margin-top:10px;
+	margin-bottom:4px;
+}
+
+#timelineArea #inputArea #friendName{
+	width:340px;
+	height: 16px;
+}
+
+#timelineArea #messageArea p{
+	font-size:12px;
+}
+
+#timelineArea #messageArea #spacer{
+	margin-top:5px;
+	margin-bottom:5px;
+	border-bottom:solid 1px #C0C0C0;
+}
+
+#timelineArea #messageArea .userName{
+	font-size:14px;
+	font-style:italic;
+	font-weight:bold;
+	display: inline-block;
+	padding-right: 10px;
+}
+
+#timelineArea #messageArea .userNameSub{
+	font-size:12px;
+	font-style:italic;
+	display: inline-block;
+}
+
+#timelineArea #messageArea .description{
+	font-size:12px;
+	font-style:italic;
+}
+
+#timelineArea .friendConfirm{
+	clear:both;
+	width:68px;
+	height:18px;
+	background:#ffb6c1;
+	text-align:center;
+	line-height:10px;
+	color:#FFFFFF;
+	font-size:11px;
+	font-weight:bold;
+	margin-top:6px;
+	cursor: pointer;
+}
+
+#timelineArea .friend{
+	clear:both;
+	width:68px;
+	height:18px;
+	background:#a8efaf;
+	text-align:center;
+	line-height:10px;
+	color:#FFFFFF;
+	font-size:11px;
+	font-weight:bold;
+	margin-top:6px;
+	cursor: default;
+}
+
+</style>
+<title>KaoHon</title>
+</head>
+<body>
+
+	<div id="container">
+		<div id="headerArea">
+			<h1 id="title">KaoHon</h1>
+			<p id="logout">ログアウト</p>
+			<div id="spacer"></div>
+		</div>
+		<div id="profileArea">
+			<h1 id="userName"></h1>
+			<div id="familyName"  class="nameArea"></div>
+			<div id="firstName" class="nameArea"></div>
+			<div id="description" class="descriptionArea"></div>
+			<div id="spacer"></div>
+		
+			<div id="menuArea">
+				<div id="menuTimeline" class="menuItem">タイムライン</div>
+				<div id="menuFriendList" class="menuItem">友達一覧</div>
+				<div id="menuFriendSearch" class="menuItem">友達検索</div>
+				<div id="menuFriendRequest" class=menuItemCurrent>友達申請一覧</div>
+			</div>
+		</div>
+		<div id="timelineArea">
+			<div id="inputArea">
+				<p>承認待ち友達申請一覧</p>
+			</div>
+			<div id="messageArea">
+			</div>
+			<div id="loadingArea">
+			</div>
+		</div>
+	</div>
+
+</body>
+</html>

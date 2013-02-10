@@ -1,0 +1,654 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta http-equiv="Content-Language" content="ja" />
+<meta http-equiv="Content-Style-Type" content="text/css" />
+<meta http-equiv="Content-Script-Type" content="text/javascript" />
+
+<link type="text/css" href="css/jquery-ui-1.10.0.custom.min.css" rel="stylesheet" />
+<script type="text/javascript" src="js/jquery-1.8.3.min.js"></script>
+<script type="text/javascript" src="js/jquery-ui-1.10.0.custom.min.js"></script>
+<script type="text/javascript" src="js/jquery.cookie.js"></script>
+<script type="text/javascript">
+
+//
+var lastTimestamp = null; 
+var firstTimestamp = null;
+
+$(function(){
+	$("#container").hide();
+	console.log($.cookie());
+
+	$.ajax({
+		type: "POST",
+		url: "./cgi/svc/checkLoginStatus.php",
+		data: {
+		},
+		dataType: "json",
+		complete: function(data) {
+			var res = $.parseJSON(data.responseText);
+			console.log(data.responseText);
+			if(res.result){
+				$("#container").show();
+				doInit();
+			}else{
+				window.location.href="./index.html";
+			}
+		}
+	});
+
+});
+
+function doInit(){
+	$("#loadingArea").prepend('<div id="loadingImg"><img alt="LOADING" src="img/loading.gif"></img></div>');
+
+	$("#userName").text($.cookie("userName"));
+	$("#firstName").text($.cookie("firstName"));
+	$("#familyName").text($.cookie("familyName"));
+	$("#description").text($.cookie("description"));
+
+	configModal();
+
+	/*
+	$.ajax({
+		type: "POST",
+		url: "./cgi/svc/getUserInfo.php",
+		data: {
+		},
+		dataType: "json",
+		complete: function(data) {
+			var res = $.parseJSON(data.responseText);
+			
+			//
+			$("#userName").text(res.userName);
+			$("#firstName").text(res.firstName);
+			$("#familyName").text(res.familyName);
+			$("#description").text(res.description);
+		}
+	});*/
+
+	var postData = {};
+	loadMessage(postData,false);
+}
+
+function configModal(){
+    //ダイアログで使用するdivを追加
+    $("body").append('<div id="modalDialog"><img alt="LOADING" src="img/loading.gif" align="center"></img></div>');
+
+    $("#modalDialog").dialog({
+    	height:"110",
+    	width:"auto",
+    	resizable: "none",
+    	closeOnEscape: false,
+        modal: true,
+        autoOpen: false,
+        buttons: {},
+	    open:function(event, ui){
+	    	$(".ui-dialog-titlebar").hide();
+	    	
+	    	$(".ui-widget-overlay").css("opacity","0.1");
+	    	$(".ui-widget-overlay").css("background-color","none");
+	    	
+	    	$(".ui-dialog").css("opacity","0.05");
+	    	$(".ui-dialog").css("background-color","none");
+	    	$(".ui-dialog").css("border","none");
+	    }
+    });
+}
+
+$("#loadMessage").live("click", function(){
+	var postData = {};
+	if(lastTimestamp!=null){
+		postData["timestamp"] = lastTimestamp;
+	}
+	
+	$("#loadingImg").show();
+	loadMessage(postData,false);
+});
+
+$("#addMessage").live("click", function(){
+	var message = $("#messageInput").val();
+	if(message.replace(/[\s　]+/,"")==""){return;}
+	$("#modalDialog").dialog("open");
+	
+	var postData = {};
+	postData["message"] = message;
+	
+	$.ajax({
+		type: "POST",
+		url: "./cgi/svc/addMessage.php",
+		data: postData,
+		dataType: "json",
+		complete: function(data) {
+			var res = $.parseJSON(data.responseText);
+			console.log(res);
+			$("#modalDialog").dialog("close");
+			
+			//メッセージ登録成功時に再読み込み
+			if(res.result){
+				$("#messageInput").val("");
+				$("#messageArea").prepend('<div id="loadingImgFresh"><img alt="LOADING" src="img/loading.gif"></img></div>');
+				
+				//
+				var postData = {};
+				if(firstTimestamp!=null){
+					postData["timestamp"] = firstTimestamp;
+					postData["fresh"] = true;
+				}
+				
+				loadMessage(postData,true);
+			}
+		}
+	});
+});
+
+function loadMessage(postData,fresh){
+	
+	$.ajax({
+		type: "POST",
+		url: "./cgi/svc/getTimeline.php",
+		data: postData,
+		dataType: "json",
+		complete: function(data) {
+			var res = $.parseJSON(data.responseText);
+			var timeline = res.timeline;
+
+			var max = timeline.length
+			for(var i=0; i<max; i++){
+				if(i==0&&fresh){firstTimestamp = null;}
+
+				var goodStr = timeline[i].good ? "イイネェ" : "イイネ！";
+				var goodCls = timeline[i].good ? "goodDone" : "good";
+				
+				var goodCountStr = timeline[i].goodCount==0 ? "" : "イイネ " + timeline[i].goodCount + " 件";
+				var commentCountStr = timeline[i].commentCount==0 ? "" : "コメント " + timeline[i].commentCount + " 件";
+				var commentOpenStr = timeline[i].commentCount==0 ? "" : '\t<div class="commentOpen">コメント表示</div>';
+				
+				var appendStr
+					= '<div class="message" id="' + timeline[i].messageId + '">'
+					+ '\t<div class="userName">' + timeline[i].userName + '</div>'
+					+ '\t<div class="msgTimestamp">' + timeline[i].timestamp + '</div>' 
+					+ '\t<p>' + timeline[i].message + '</p>'
+					+ '\t<button class="' + goodCls + '" id="goodButton">' + goodStr + '</button>'
+					+ '\t<button class="comment">コメント</button>'
+					+ '\t<div class="padding"></div>'
+					+ '\t<div class="count" id="goodCount">' + goodCountStr + '</div>'
+					+ '\t<div class="count" id="commentCount">' + commentCountStr + '</div>' 
+					+ commentOpenStr
+					+ '\t<div class="commentArea">'
+					+ '\t\t<div class="commentInputArea"></div>'
+					+ '\t\t<div class="commentListArea"></div>'
+					+ '</div>'
+					+ '\t<div class="spacer"></div>'
+					+ '</div>';
+				
+				if(fresh){
+					$(appendStr).hide().prependTo("#messageArea").fadeIn();
+					//$("#messageArea").prepend(appendStr);
+				}else{
+					$(appendStr).hide().appendTo("#messageArea").fadeIn();
+					//$("#messageArea").append(appendStr);
+				}
+				
+				if(firstTimestamp==null){firstTimestamp = timeline[i].timestamp;}
+				if(!fresh){lastTimestamp = timeline[i].timestamp;}
+			}
+
+			$("#loadingImg").hide();
+			$("#loadingImgFresh").remove();
+		}
+	});
+}
+
+//
+$(".good").live("click",function(){
+	var messageId = $(this).parent().attr("id");
+	var postData = {messageId:messageId};
+	$("#modalDialog").dialog("open");
+	console.log(messageId);
+
+	$.ajax({
+		type: "POST",
+		url: "./cgi/svc/addGood.php",
+		data: postData,
+		dataType: "json",
+		complete: function(data) {
+			var res = $.parseJSON(data.responseText);
+			console.log(res);
+			$("#modalDialog").dialog("close");
+
+			if(res.result){
+				var button = $("#"+messageId).children("#goodButton");
+				button.attr("class","goodDone");
+				button.text("イイネェ");
+				
+				var count = $("#"+messageId).children("#goodCount");
+				count.text("イイネ " + res.count + " 件");
+			}
+		}
+	});
+
+});
+
+$(".comment").live("click",function(){
+	$(".commentInputArea").empty();
+	
+	var commentInputArea = $(this).nextAll(".commentArea").children(".commentInputArea");
+	var appendStr = '<textarea id="commentInput" rows="1" cols="42" maxlength="100"></textarea>'
+					+ '<button class="commentSend">送信</button>';
+
+	commentInputArea.prepend(appendStr);
+});
+
+$(".commentSend").live("click",function(){
+	var messageId = $(this).parents(".message").attr("id");
+	var comment = $(this).prevAll("#commentInput").val();
+	if(comment.replace(/[\s　]+/,"")==""){return;}
+	var postData = {messageId:messageId,comment:comment};
+	$("#modalDialog").dialog("open");
+
+	$.ajax({
+		type: "POST",
+		url: "./cgi/svc/addComment.php",
+		data: postData,
+		dataType: "json",
+		complete: function(data) {
+			var res = $.parseJSON(data.responseText);
+			console.log(res);
+			$("#modalDialog").dialog("close");
+
+			if(res.result){
+				$(".commentInputArea").empty();
+				
+				var commentCount = $("#"+messageId).children("#commentCount")
+				commentCount.text("コメント " + res.commentList.length + " 件")
+				
+				setCommentList(messageId,res.commentList);
+			}
+		}
+	});
+
+});
+
+$(".commentOpen").live("click",function(){
+	var messageId = $(this).parent().attr("id");
+	var postData = {messageId:messageId};
+	
+	var commentArea = $(this).parent().children(".commentArea");
+	commentArea.prepend('<div id="loadingImgComment"><img alt="LOADING" src="img/loadingMini.gif"></img></div>');
+	
+	$.ajax({
+		type: "POST",
+		url: "./cgi/svc/getComment.php",
+		data: postData,
+		dataType: "json",
+		complete: function(data) {
+			var res = $.parseJSON(data.responseText);
+			console.log(res);
+			commentArea.children("#loadingImgComment").remove();
+
+			setCommentList(messageId,res.commentList);			
+		}
+	});
+});
+
+function setCommentList(messageId,list) {
+	var commentListArea = $("#"+messageId).children(".commentArea").children(".commentListArea");
+	commentListArea.empty();
+	
+	var max = list.length
+	for(var i=0; i<max; i++){
+		var appendStr
+			= '<div class="commentListItem">'
+			+ '<div class="commentSpacer"></div>'
+			+ '<div class="commentUserName">' + list[i].userName + '</div>'
+			+ '<div class="commentString">' + list[i].comment + '</div>'
+			+ '</div>';
+
+		//commentListArea.append(appendStr);
+		$(appendStr).hide().appendTo("#"+messageId+" .commentArea .commentListArea").fadeIn();
+	}
+	var commentOpen = $("#"+messageId).children(".commentOpen");
+	commentOpen.hide();
+}
+
+//menu list
+
+$("#title").live("click",function(){
+	window.location.href="./list.html";
+});
+
+$("#menuFriendList").live("click",function(){
+	window.location.href="./friendList.html";
+});
+
+$("#menuFriendSearch").live("click",function(){
+	window.location.href="./friendSearch.html";
+});
+
+$("#menuFriendRequest").live("click",function(){
+	window.location.href="./friendRequest.html";
+});
+
+$("#logout").live("click",function(){
+	$.ajax({
+		type: "POST",
+		url: "./cgi/svc/logout.php",
+		data: {},
+		dataType: "json",
+		complete: function(data) {
+			for(var key in $.cookie()){
+				$.cookie(key,null);
+			}
+			window.location.href="./index.html";
+		}
+	});
+});
+
+</script>
+<style type="text/css">
+p, h1, form, button{border:0; margin:0; padding:0;}
+textarea{resize:none;}
+
+body {
+	text-align:center;
+}
+
+#container {
+	width:700px;
+	margin-left:auto;
+	margin-right:auto;
+	text-align:left;
+	background:#ebf4fb;
+	padding:14px;
+}
+
+#headerArea h1 {
+	font-size:16px;
+	font-weight:bold;
+	margin-bottom:2px;
+	margin-left:2px;
+	padding-bottom:6px;
+	display: inline-block;
+	cursor: pointer;
+}
+
+#headerArea #logout {
+	color: #A0A0A0;
+	font-size:8px;
+	float:right;
+	margin-top:8px;
+	margin-bottom:1px;
+	margin-right:4px;
+	padding-bottom:1px;
+	display: inline-block;
+	cursor: pointer;
+}
+
+#headerArea #spacer {
+	border-bottom:solid 1px #b7ddf2;
+}
+
+#profileArea {
+	width:190px;
+	float:left;
+	margin:20px 2px 20px 2px;
+	cursor: default;
+}
+#profileArea h1 {
+	font-size:12px;
+	font-weight:bold;
+	margin-bottom:8px;
+	border-bottom:solid 1px #b7ddf2;
+	padding-top:4px;
+	padding-bottom:8px;
+}
+#profileArea .nameArea {
+	font-size:10px;
+	margin-bottom:8px;
+	padding-bottom:2px;
+	display: inline-block;
+}
+#profileArea .descriptionArea {
+	font-size:12px;
+	margin-bottom:2px;
+	padding-bottom:2px;
+}
+
+#profileArea #spacer{
+	margin-top:15px;
+	margin-bottom:5px;
+	border-bottom:solid 1px #b7ddf2;
+}
+
+#menuArea div{
+	font-size:12px;
+	margin-top:10px;
+	margin-bottom:10px;
+}
+
+#menuArea .menuItem{
+	margin-left:10px;
+	cursor: pointer;
+	color: #b7ddff;
+	font-weight:bold;
+}
+
+#menuArea .menuItemCurrent{
+	margin-left:10px;
+	cursor: default;
+	color: #C0C0C0;
+	font-weight:bold;
+}
+
+#timelineArea {
+	width:483px;
+	float:left;
+	margin:10px 2px 20px 2px;
+	padding-left: 16px;
+	cursor: default;
+}
+
+#timelineArea .submit{
+	clear:both;
+	width:100px;
+	height:25px;
+	background:#666666;
+	text-align:center;
+	line-height:10px;
+	color:#FFFFFF;
+	font-size:11px;
+	font-weight:bold;
+	margin-top:6px;
+	cursor: pointer;
+}
+
+#timelineArea .good{
+	clear:both;
+	width:68px;
+	height:18px;
+	background:#b7ddf2;
+	text-align:center;
+	line-height:10px;
+	color:#FFFFFF;
+	font-size:11px;
+	font-weight:bold;
+	margin-top:6px;
+	cursor: pointer;
+}
+
+#timelineArea .goodDone{
+	clear:both;
+	width:68px;
+	height:18px;
+	background:#a8efaf;
+	text-align:center;
+	line-height:10px;
+	color:#FFFFFF;
+	font-size:11px;
+	font-weight:bold;
+	margin-top:6px;
+}
+
+#timelineArea .comment{
+	clear:both;
+	width:68px;
+	height:18px;
+	background:#b7ddf2;
+	text-align:center;
+	line-height:10px;
+	color:#FFFFFF;
+	font-size:11px;
+	font-weight:bold;
+	margin-top:6px;
+	cursor: pointer;
+}
+
+#timelineArea .commentSend{
+	clear:both;
+	width:68px;
+	height:18px;
+	background:#666666;
+	text-align:center;
+	line-height:10px;
+	color:#FFFFFF;
+	font-size:11px;
+	font-weight:bold;
+	margin-left:8px;
+	cursor: pointer;
+}
+
+#timelineArea #inputArea {
+	font-size:14px;
+	font-weight:bold;
+	margin-top:14px;
+	margin-bottom:2px;
+	border-bottom:solid 1px #b7ddf2;
+	padding-bottom:6px;
+}
+
+#timelineArea #inputArea p{
+	margin-top:10px;
+	margin-bottom:4px;
+}
+
+#timelineArea #messageArea p{
+	font-size:14px;
+	color:#696969;
+	padding-top: 5pt;
+	padding-bottom: 2pt;
+	padding-left: 8pt;
+	padding-right: 8pt;
+}
+
+#timelineArea #messageArea .spacer{
+	margin-top:5px;
+	margin-bottom:5px;
+	border-bottom:solid 1px #C0C0C0;
+}
+
+#timelineArea #messageArea .userName{
+	font-size:14px;
+	font-weight:bold;
+	color: #2860a3;
+	display: inline-block;
+	width: 380px;
+}
+
+#timelineArea #messageArea .msgTimestamp{
+	font-size:10px;
+	color: #A9A9A9;
+	display: inline-block;
+}
+
+#timelineArea #messageArea .padding{
+	padding-left:10px;
+	display: inline-block;
+}
+
+#timelineArea #messageArea .count{
+	font-size:10px;
+	font-weight:bold;
+	color: #A9A9A9;
+	width: 50pt;
+	display: inline-block;
+}
+
+#timelineArea #messageArea .commentOpen{
+	font-size:10px;
+	font-weight:bold;
+	color: #007bc3;
+	width: 50pt;
+	cursor: pointer;
+	display: inline-block;
+}
+
+#timelineArea #messageArea .commentArea{
+	margin:0;
+	padding-top: 5pt;
+	padding-left:20pt;
+	padding-right: 5pt;
+}
+
+#timelineArea #messageArea .commentUserName{
+	font-size:10px;
+	font-style: italic;
+	padding-bottom:2pt;
+	color:#696969;
+}
+
+#timelineArea #messageArea .commentString{
+	font-size:12px;
+	padding-left:5pt;
+	color:#696969;
+}
+
+#timelineArea #messageArea .commentSpacer{
+	margin-top:5px;
+	margin-bottom:5px;
+	border-bottom:solid 1px #f0f0f0;
+}
+
+
+</style>
+<title>KaoHon</title>
+</head>
+<body>
+
+	<div id="container">
+		<div id="headerArea">
+			<h1 id="title">KaoHon</h1>
+			<p id="logout">ログアウト</p>
+			<div id="spacer"></div>
+		</div>
+		<div id="profileArea">
+			<h1 id="userName"></h1>
+			<div id="familyName"  class="nameArea"></div>
+			<div id="firstName" class="nameArea"></div>
+			<div id="description" class="descriptionArea"></div>
+			<div id="spacer"></div>
+			
+			<div id="menuArea">
+				<div id="menuTimeline" class="menuItemCurrent">タイムライン</div>
+				<div id="menuFriendList" class="menuItem">友達一覧</div>
+				<div id="menuFriendSearch" class="menuItem">友達検索</div>
+				<div id="menuFriendRequest" class="menuItem">友達申請一覧</div>
+			</div>
+		</div>
+		<div id="timelineArea">
+			<div id="inputArea">
+				<p>メッセージ入力</p>
+				<textarea id="messageInput" rows="3" cols="56" maxlength="100"></textarea>
+				<button id="addMessage" class="submit">送信</button>
+			</div>
+			<div id="messageArea">
+			</div>
+			<div id="loadingArea">
+				<button id="loadMessage" class="submit">読み込み</button>
+			</div>
+		</div>
+	</div>
+</body>
+</html>

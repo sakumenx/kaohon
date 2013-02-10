@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta http-equiv="Content-Language" content="ja" />
+<meta http-equiv="Content-Style-Type" content="text/css" />
+<meta http-equiv="Content-Script-Type" content="text/javascript" />
+
+<link type="text/css" href="css/jquery-ui-1.10.0.custom.min.css" rel="stylesheet" />
+<script type="text/javascript" src="js/jquery-1.8.3.min.js"></script>
+<script type="text/javascript" src="js/jquery-ui-1.10.0.custom.min.js"></script>
+<script type="text/javascript" src="js/jquery.cookie.js"></script>
+<script type="text/javascript">
+
+function configModal(){
+    //ダイアログで使用するdivを追加
+    $("body").append('<div id="modalDialog"><img alt="LOADING" src="img/loading.gif" align="center"></img></div>');
+
+    $("#modalDialog").dialog({
+    	height:"110",
+    	width:"auto",
+    	resizable: "none",
+    	closeOnEscape: false,
+        modal: true,
+        autoOpen: false,
+        buttons: {},
+	    open:function(event, ui){
+	    	$(".ui-dialog-titlebar").hide();
+	    	
+	    	$(".ui-widget-overlay").css("opacity","0.1");
+	    	$(".ui-widget-overlay").css("background-color","none");
+	    	
+	    	$(".ui-dialog").css("opacity","0.05");
+	    	$(".ui-dialog").css("background-color","none");
+	    	$(".ui-dialog").css("border","none");
+	    }
+    });
+}
+
+$(function(){
+	configModal();
+});
+
+
+$("#registUser").live("click", function(){
+    $("#modalDialog").dialog("open");
+	
+	var postData = {
+			mailAddress: $("#mailAddress").val(),
+			userName: $("#userName").val(),
+			firstName: $("#firstName").val(),
+			familyName: $("#familyName").val(),
+			description: $("#description").val(),
+			password1: $("#password1").val(),
+			password2: $("#password2").val()
+	};
+	
+	$.ajax({
+		type: "POST",
+		url: "./cgi/svc/registUser.php",
+		data: postData,
+		dataType: "json",
+		complete: function(data) {
+			var res = $.parseJSON(data.responseText);
+			if(res.result){
+				$.cookie("userName", res.userInfo.userName);
+				$.cookie("firstName", res.userInfo.firstName);
+				$.cookie("familyName", res.userInfo.familyName);
+				$.cookie("description", res.userInfo.description);
+
+				window.location.href="./list.html";
+			}else{
+			    $("#modalDialog").dialog("close");
+				alert(res.reason);
+			}
+		}
+	});
+
+});
+</script>
+
+<style type="text/css">
+p, h1, form, button{border:0; margin:0; padding:0;}
+textarea{resize:none;}
+.spacer{clear:both; height:1px;}
+.spacerTop{clear:both; height:100px;}
+
+#loginArea{
+	border:solid 2px #b7ddf2;
+	background:#ebf4fb;
+	margin:0 auto;
+	width:400px;
+	padding:14px;
+}
+#loginArea h1 {
+	font-size:16px;
+	font-weight:bold;
+	margin-bottom:8px;
+	border-bottom:solid 1px #b7ddf2;
+	padding-bottom:10px;
+	cursor: default;
+}
+#loginArea label{
+	font-size:12px;
+	display:block;
+	font-weight:bold;
+	text-align:right;
+	width:140px;
+	float:left;
+	padding:4px 0 0 0;
+	margin:2px 0 20px 10px;
+}
+#loginArea input, textarea{
+	float:left;
+	font-size:12px;
+	padding:4px 2px;
+	border:solid 1px #aacfe4;
+	width:200px;
+	margin:2px 0 20px 10px;
+}
+
+#loginArea input .password,.username,.mailaddress{
+	ime-mode:disabled;
+}
+
+#loginArea button{
+	clear:both;
+	margin-left:160px;
+	width:100px;
+	height:25px;
+	background:#666666;
+	text-align:center;
+	line-height:10px;
+	color:#FFFFFF;
+	font-size:11px;
+	font-weight:bold;
+	cursor:pointer;
+}
+</style>
+<title>KaoHon</title>
+</head>
+<body>
+<div class="spacerTop"></div>
+<div id="loginArea" class="form">
+<h1>新規登録</h1>
+
+<label>メールアドレス</label>
+<input type="text" name="mailAddress" id="mailAddress" class="mailaddress" maxlength="50"></input>
+
+<label>ユーザー名</label>
+<input type="text" name="userName" id="userName" class="username" maxlength="20"></input>
+
+<label>ファミリーネーム</label>
+<input type="text" name="familyName" id="familyName" maxlength="20"></input>
+
+<label>ファーストネーム</label>
+<input type="text" name="firstName" id="firstName" maxlength="20"></input>
+
+<label>自己紹介</label>
+<textarea name="description" id="description" maxlength="200"></textarea>
+
+<label>パスワード</label>
+<input type="password" name="password1" id="password1" class="password" maxlength="50"></input>
+
+<label>再入力</label>
+<input type="password" name="password2" id="password2" class="password" maxlength="50"></input>
+
+<button type="submit" id="registUser">登録</button>
+<div class="spacer"></div>
+
+</div>
+
+
+</body>
+</html>
